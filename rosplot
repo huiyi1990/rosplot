@@ -1,0 +1,126 @@
+#! /usr/bin/env python
+
+# import from a relative path
+import sys, os, inspect
+pydir = os.path.realpath(os.path.abspath(os.path.join(os.path.split(inspect.getfile(inspect.currentframe()))[0],"pyqtgraph")))
+if pydir not in sys.path:
+    sys.path.insert(0, pydir)
+
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+import threading
+
+from pyqtgraph.Qt import QtGui, QtCore
+import pyqtgraph as pg
+import numpy as np
+import time
+
+import yaml
+
+#---------------------------------------------------
+# GUI THREAD
+#---------------------------------------------------
+
+class MainWindow(QtGui.QMainWindow):
+    def __init__(self):
+        super(MainWindow, self).__init__()
+
+        self.view = pg.GraphicsLayoutWidget()  ## GraphicsView with GraphicsLayout inserted by default
+        self.setCentralWidget(self.view)
+
+        self.w = self.view.addPlot()
+
+        self.s1 = pg.ScatterPlotItem(size=5, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 120))
+        self.w.addItem(self.s1)
+
+        self.resize(640,480)
+        self.setWindowTitle('rosplot')
+        self.show()
+
+    def setData(self, data):
+        pos = np.asarray(data)
+        spots = [{'pos': pos[i,:], 'data': 1} for i in range(pos.shape[0])]
+        self.s1.setData(spots)
+
+    def addPoints(self, data):
+        pos = np.asarray(data)
+        spots = [{'pos': pos[i,:], 'data': 1} for i in range(pos.shape[0])]
+        self.s1.addPoints(spots)
+
+#---------------------------------------------------
+# INPUT THREAD
+#---------------------------------------------------
+
+class InputThread(QtCore.QThread):
+    input_received = QtCore.pyqtSignal(object)
+
+    def __init__(self, argv):
+        QtCore.QThread.__init__(self)
+        self.data = []
+
+        try:
+            self.x_field = argv[1]
+            self.y_field = argv[2]
+        except:
+            print ""
+            print "usage: rostopic echo [topic] | rosplot [x field] [y field]"
+            print "example: rostopic echo /robot_pose | rosplot pose.position.x pose.position.y"
+            print ""
+            print "special field keyword: time"
+            print "example: rostopic echo /navsat/enu | rosplot time pose.position.z"
+            print ""
+            sys.exit(1)
+
+    def run(self):
+        yaml_string = ""
+        while True:
+            line = sys.stdin.readline()
+            if "---" in line:
+                if yaml_string != "":
+                    doc = yaml.load(yaml_string)
+                    x = 0
+                    y = 0
+                    
+                    if self.x_field == "time":
+                        x = float(doc.header.secs) + float(doc.header.nsecs)/1.0e9
+                    else:
+                        x = self.traverse(doc, self.x_field)
+
+                    if self.y_field == "time":
+                        y = float(doc.header.secs) + float(doc.header.nsecs)/1.0e9
+                    else:
+                        y = self.traverse(doc, self.y_field)
+
+                    self.data.append([x,y])
+                    self.setData(self.data)
+
+                yaml_string = ""
+
+            else:
+                yaml_string += "\n" + line
+
+    def setData(self, data):
+        self.input_received.emit(data)
+
+    def traverse(self, doc, address):
+        path = address.split(".")
+        i = 0
+        node = doc
+        while i < len(path):
+            node = node[path[i]]
+            i += 1
+
+        return float(node)
+
+#---------------------------------------------------
+# main
+#---------------------------------------------------
+
+if __name__ == '__main__':
+    app = QtGui.QApplication([])
+    it = InputThread(sys.argv)
+    it.start()
+    window = MainWindow()
+    it.input_received.connect(window.setData)
+    sys.exit(app.exec_())
