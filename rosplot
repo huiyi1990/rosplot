@@ -64,7 +64,6 @@ class InputThread(QtCore.QThread):
 
     def __init__(self, argv):
         QtCore.QThread.__init__(self)
-        self.data = []
 
         try:
             self.x_field = argv[1]
@@ -90,18 +89,17 @@ class InputThread(QtCore.QThread):
                     doc = yaml.load(yaml_string)
                     
                     if self.x_field == "time":
-                        x = float(doc.header.secs) + float(doc.header.nsecs)/1.0e9
+                        x = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
                     else:
                         x = self.traverse(doc, self.x_field)
 
                     if self.y_field == "time":
-                        y = float(doc.header.secs) + float(doc.header.nsecs)/1.0e9
+                        y = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
                     else:
                         y = self.traverse(doc, self.y_field)
 
                     if x != None and y != None:
-                        self.data.append([x,y])
-                        self.setData(self.data)
+                        self.addPoints([[x,y]])
 
                 yaml_string = ""
 
