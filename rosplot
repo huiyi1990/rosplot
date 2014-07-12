@@ -65,9 +65,18 @@ class InputThread(QtCore.QThread):
     def __init__(self, argv):
         QtCore.QThread.__init__(self)
 
+        self.point_buffer = []
+        
+        self.last_update = int(round(time.time()*1000))
+        self.update_interval = int(get_arg("--update_interval", 200))
+        self.update_interval = int(get_arg("-i", self.update_interval))
+
+        self.point_count = int(get_arg("-c", -1))
+        self.point_count = int(get_arg("--point_count", self.point_count))
+
         try:
-            self.x_field = argv[1]
-            self.y_field = argv[2]
+            self.x_field = get_targ(1)
+            self.y_field = get_targ(2)
         except:
             print ""
             print "usage: rostopic echo [topic] | rosplot [x field] [y field]"
@@ -76,6 +85,18 @@ class InputThread(QtCore.QThread):
             print "special field keyword: time"
             print "example: rostopic echo /navsat/enu | rosplot time pose.position.z"
             print ""
+            sys.exit(1)
+
+        if arg_set("-h") or arg_set("--help"):
+            print """
+        rostopic echo [topic] | rosplot [options] [x field] [y field]"
+
+        options:
+            
+            -i --update_interval : milliseconds between plot updates
+            -c --point_count : max points to plot in sliding window
+                
+            """
             sys.exit(1)
 
 #---------------------------------------------------
@@ -114,7 +135,26 @@ class InputThread(QtCore.QThread):
 #---------------------------------------------------
 
     def addPoints(self, data):
-        self.add_points_signal.emit(data)
+        self.point_buffer.extend(data)
+        
+        time_now = int(round(time.time()*1000))
+
+        if time_now - self.last_update > self.update_interval:
+            
+            if self.point_count == -1:
+                
+                self.add_points_signal.emit(self.point_buffer)
+                self.point_buffer = []
+                self.last_update = time_now
+            
+            else:
+                
+                if len(self.point_buffer) > self.point_count:
+                    excess = len(self.point_buffer) - self.point_count
+                    del self.point_buffer[0:excess]
+
+                self.set_data_signal.emit(self.point_buffer)
+                self.last_update = time_now
 
 #---------------------------------------------------
 
@@ -143,6 +183,32 @@ class InputThread(QtCore.QThread):
 #---------------------------------------------------
 # main
 #---------------------------------------------------
+
+def get_arg(arg, default):
+    for i,v in enumerate(sys.argv):
+        if v == arg:
+            if i+1 < len(sys.argv):
+                return sys.argv[i+1]
+            else:
+                return default
+
+    return default
+
+# get non-option args
+def get_targ(idx):
+    i = 0
+    for v in sys.argv:
+        if not v.startswith("-"):
+            if idx == i:
+                return v
+            i += 1
+
+def arg_set(arg):
+    for v in sys.argv:
+        if v == arg:
+            return True
+
+    return False
 
 if __name__ == '__main__':
     app = QtGui.QApplication([])
