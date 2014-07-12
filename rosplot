@@ -38,10 +38,14 @@ class MainWindow(QtGui.QMainWindow):
         self.setWindowTitle('rosplot')
         self.show()
 
+#---------------------------------------------------
+
     def setData(self, data):
         pos = np.asarray(data)
         spots = [{'pos': pos[i,:], 'data': 1} for i in range(pos.shape[0])]
         self.s1.setData(spots)
+
+#---------------------------------------------------
 
     def addPoints(self, data):
         pos = np.asarray(data)
@@ -53,7 +57,10 @@ class MainWindow(QtGui.QMainWindow):
 #---------------------------------------------------
 
 class InputThread(QtCore.QThread):
-    input_received = QtCore.pyqtSignal(object)
+    set_data_signal = QtCore.pyqtSignal(object)
+    add_points_signal = QtCore.pyqtSignal(object)
+
+#---------------------------------------------------
 
     def __init__(self, argv):
         QtCore.QThread.__init__(self)
@@ -72,6 +79,8 @@ class InputThread(QtCore.QThread):
             print ""
             sys.exit(1)
 
+#---------------------------------------------------
+
     def run(self):
         yaml_string = ""
         while True:
@@ -79,8 +88,6 @@ class InputThread(QtCore.QThread):
             if "---" in line:
                 if yaml_string != "":
                     doc = yaml.load(yaml_string)
-                    x = 0
-                    y = 0
                     
                     if self.x_field == "time":
                         x = float(doc.header.secs) + float(doc.header.nsecs)/1.0e9
@@ -92,26 +99,48 @@ class InputThread(QtCore.QThread):
                     else:
                         y = self.traverse(doc, self.y_field)
 
-                    self.data.append([x,y])
-                    self.setData(self.data)
+                    if x != None and y != None:
+                        self.data.append([x,y])
+                        self.setData(self.data)
 
                 yaml_string = ""
 
             else:
                 yaml_string += "\n" + line
 
+#---------------------------------------------------
+
     def setData(self, data):
-        self.input_received.emit(data)
+        self.set_data_signal.emit(data)
+
+#---------------------------------------------------
+
+    def addPoints(self, data):
+        self.add_points_signal.emit(data)
+
+#---------------------------------------------------
 
     def traverse(self, doc, address):
-        path = address.split(".")
-        i = 0
-        node = doc
-        while i < len(path):
-            node = node[path[i]]
-            i += 1
+        try:
+            path = address.split(".")
+            i = 0
+            node = doc
+            while i < len(path):
+                if "[" in path[i] or "]" in path[i]:
+                    p = path[i].split("[")[0]
+                    idx = int(path[i].split("[")[1].split("]")[0])
+                    node = node[p]
+                    node = node[idx]
+                else:
+                    node = node[path[i]]
 
-        return float(node)
+                i += 1
+
+            return float(node)
+
+        except:
+            print "warning, could not parse %s in %s" % (address, doc)
+            return None
 
 #---------------------------------------------------
 # main
@@ -122,5 +151,6 @@ if __name__ == '__main__':
     it = InputThread(sys.argv)
     it.start()
     window = MainWindow()
-    it.input_received.connect(window.setData)
+    it.set_data_signal.connect(window.setData)
+    it.add_points_signal.connect(window.addPoints)
     sys.exit(app.exec_())
