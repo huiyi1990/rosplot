@@ -29,17 +29,17 @@ class MainWindow(QtGui.QMainWindow):
         pg.setConfigOption('background', get_arg("-bg", "w"))
         pg.setConfigOption('foreground', get_arg("-fg", "k"))
 
-        self.r = int(get_arg("-r", 0))
-        self.g = int(get_arg("-g", 0))
-        self.b = int(get_arg("-b", 0))
-        self.a = int(get_arg("-a", 200))
-
         self.view = pg.GraphicsLayoutWidget()  ## GraphicsView with GraphicsLayout inserted by default
         self.setCentralWidget(self.view)
 
         self.w = self.view.addPlot()
 
-        self.s1 = pg.ScatterPlotItem(size=5, pen=pg.mkPen(None), brush=pg.mkBrush(self.r, self.g, self.b, self.a))
+        self.s1 = pg.ScatterPlotItem(
+                size = int(get_arg("--size", 4)),
+                pen = pg.mkPen(None),
+                brush = pg.mkBrush(0,0,0,150),
+                symbol = get_arg("--symbol", "o"),
+                antialias = True)
 
         self.w.addItem(self.s1)
 
