@@ -26,8 +26,8 @@ class MainWindow(QtGui.QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
 
-        pg.setConfigOption('background', 'w')
-        pg.setConfigOption('foreground', 'k')
+        pg.setConfigOption('background', get_arg("-bg", "w"))
+        pg.setConfigOption('foreground', get_arg("-fg", "k"))
 
         self.r = int(get_arg("-r", 0))
         self.g = int(get_arg("-g", 0))
