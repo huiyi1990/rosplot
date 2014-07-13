@@ -239,10 +239,10 @@ class InputThread(QtCore.QThread):
                 if "[" in path[i] or "]" in path[i]:
                     p = path[i].split("[")[0]
                     idx = int(path[i].split("[")[1].split("]")[0])
-                    node = node[p]
+                    node = node[p.strip()]
                     node = node[idx]
                 else:
-                    node = node[path[i]]
+                    node = node[path[i].strip()]
 
                 i += 1
 
