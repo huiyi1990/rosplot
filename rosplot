@@ -26,16 +26,25 @@ class MainWindow(QtGui.QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
 
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
+
+        self.r = int(get_arg("-r", 0))
+        self.g = int(get_arg("-g", 0))
+        self.b = int(get_arg("-b", 0))
+        self.a = int(get_arg("-a", 200))
+
         self.view = pg.GraphicsLayoutWidget()  ## GraphicsView with GraphicsLayout inserted by default
         self.setCentralWidget(self.view)
 
         self.w = self.view.addPlot()
 
-        self.s1 = pg.ScatterPlotItem(size=5, pen=pg.mkPen(None), brush=pg.mkBrush(255, 255, 255, 120))
+        self.s1 = pg.ScatterPlotItem(size=5, pen=pg.mkPen(None), brush=pg.mkBrush(self.r, self.g, self.b, self.a))
         self.w.addItem(self.s1)
 
         self.resize(640,480)
         self.setWindowTitle('rosplot')
+
         self.show()
 
 #---------------------------------------------------
