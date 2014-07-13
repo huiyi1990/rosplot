@@ -114,6 +114,8 @@ class InputThread(QtCore.QThread):
 
         self.point_buffers = []
         
+        self.first_time = None
+
         self.last_update = int(round(time.time()*1000))
         self.update_interval = int(get_arg("--update_interval", 200))
         self.update_interval = int(get_arg("-i", self.update_interval))
@@ -176,7 +178,11 @@ class InputThread(QtCore.QThread):
 
     def traverse(self, doc, field):
         if field == "time":
-            return self.traverse_raw(doc, "header.stamp.secs") + self.traverse_raw(doc, "header.stamp.nsecs")/1.0e9
+            t = self.traverse_raw(doc, "header.stamp.secs") + self.traverse_raw(doc, "header.stamp.nsecs")/1.0e9
+            if self.first_time == None:
+                self.first_time = t
+
+            return t - self.first_time
         else:
             return self.traverse_raw(doc, field)
 
