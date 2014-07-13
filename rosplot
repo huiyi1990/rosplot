@@ -103,8 +103,10 @@ class InputThread(QtCore.QThread):
 
         options:
             
-            -i --update_interval : milliseconds between plot updates
-            -c --point_count : max points to plot in sliding window
+    [number]    -i --update_interval : milliseconds between plot updates
+    [number]    -c --point_count : max points to plot in sliding window
+    [number]    --size : the size of the points
+    [o s t d +] --symbol : the symbol to use for the points
                 
             """
             sys.exit(1)
