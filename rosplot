@@ -32,7 +32,11 @@ class MainWindow(QtGui.QMainWindow):
         self.view = pg.GraphicsLayoutWidget()  ## GraphicsView with GraphicsLayout inserted by default
         self.setCentralWidget(self.view)
 
-        self.w = self.view.addPlot()
+        self.w = self.view.addPlot(autoDownsample=True)
+
+        self.legend = self.w.addLegend()
+
+        self.legend_labels = get_targ(2).split(",")
 
         self.symbols = ["o", "s", "t", "d", "+"]
         self.brushes = [
@@ -44,11 +48,16 @@ class MainWindow(QtGui.QMainWindow):
                 pg.mkBrush(200,200,10,180)
                 ]
 
-        self.s1 = pg.ScatterPlotItem(
-                size = int(get_arg("--size", 4)),
-                pen = pg.mkPen(None),
-                brush = pg.mkBrush(0,0,0,255),
-                antialias = True)
+        for i,label in enumerate(self.legend_labels):
+            dummy_plot_item = pg.ScatterPlotItem(
+                    size=int(get_arg("--size", 12)),
+                    pen=pg.mkPen(None),
+                    brush=self.brushes[i%len(self.brushes)],
+                    symbol=self.symbols[i%len(self.symbols)])
+            self.legend.addItem(dummy_plot_item, "- - " + label)
+
+        self.s1 = pg.ScatterPlotItem(size = int(get_arg("--size", 6)),
+                pen=pg.mkPen(None))
 
         self.w.addItem(self.s1)
 
@@ -65,12 +74,13 @@ class MainWindow(QtGui.QMainWindow):
             dataset_id = data[1]
             data = data[0]
             pos = np.asarray(data)
-            spots.extend([
+            _spots = [
                 {'pos': pos[i,:], 
                 'data': 1,
                 'brush': self.brushes[dataset_id%len(self.brushes)],
                 'symbol': self.symbols[dataset_id%len(self.symbols)],
-                } for i in range(pos.shape[0])])
+                } for i in range(pos.shape[0])]
+            spots.extend(_spots)
         self.s1.setData(spots)
 
 #---------------------------------------------------
