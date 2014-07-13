@@ -34,11 +34,20 @@ class MainWindow(QtGui.QMainWindow):
 
         self.w = self.view.addPlot()
 
+        self.symbols = ["o", "s", "t", "d", "+"]
+        self.brushes = [
+                pg.mkBrush(200,10,10,180),
+                pg.mkBrush(10,200,10,180),
+                pg.mkBrush(10,10,200,180),
+                pg.mkBrush(10,200,200,180),
+                pg.mkBrush(200,10,200,180),
+                pg.mkBrush(200,200,10,180)
+                ]
+
         self.s1 = pg.ScatterPlotItem(
                 size = int(get_arg("--size", 4)),
                 pen = pg.mkPen(None),
-                brush = pg.mkBrush(0,0,0,150),
-                symbol = get_arg("--symbol", "o"),
+                brush = pg.mkBrush(0,0,0,255),
                 antialias = True)
 
         self.w.addItem(self.s1)
@@ -50,16 +59,32 @@ class MainWindow(QtGui.QMainWindow):
 
 #---------------------------------------------------
 
-    def setData(self, data):
-        pos = np.asarray(data)
-        spots = [{'pos': pos[i,:], 'data': 1} for i in range(pos.shape[0])]
+    def setData(self, datasets):
+        spots = []
+        for data in datasets:
+            dataset_id = data[1]
+            data = data[0]
+            pos = np.asarray(data)
+            spots.extend([
+                {'pos': pos[i,:], 
+                'data': 1,
+                'brush': self.brushes[dataset_id%len(self.brushes)],
+                'symbol': self.symbols[dataset_id%len(self.symbols)],
+                } for i in range(pos.shape[0])])
         self.s1.setData(spots)
 
 #---------------------------------------------------
 
     def addPoints(self, data):
+        dataset_id = data[1]
+        data = data[0]
         pos = np.asarray(data)
-        spots = [{'pos': pos[i,:], 'data': 1} for i in range(pos.shape[0])]
+        spots = [
+            {'pos': pos[i,:], 
+            'data': 1,
+            'brush': self.brushes[dataset_id%len(self.brushes)],
+            'symbol': self.symbols[dataset_id%len(self.symbols)],
+            } for i in range(pos.shape[0])]
         self.s1.addPoints(spots)
 
 #---------------------------------------------------
@@ -75,7 +100,7 @@ class InputThread(QtCore.QThread):
     def __init__(self, argv):
         QtCore.QThread.__init__(self)
 
-        self.point_buffer = []
+        self.point_buffers = []
         
         self.last_update = int(round(time.time()*1000))
         self.update_interval = int(get_arg("--update_interval", 200))
@@ -86,10 +111,10 @@ class InputThread(QtCore.QThread):
 
         try:
             self.x_field = get_targ(1)
-            self.y_field = get_targ(2)
+            self.y_fields = get_targ(2).split(",")
         except:
             print ""
-            print "usage: rostopic echo [topic] | rosplot [x field] [y field]"
+            print "usage: rostopic echo [topic] | rosplot [x field] [y field(s)]"
             print "example: rostopic echo /robot_pose | rosplot pose.position.x pose.position.y"
             print ""
             print "special field keyword: time"
@@ -99,14 +124,13 @@ class InputThread(QtCore.QThread):
 
         if arg_set("-h") or arg_set("--help"):
             print """
-        rostopic echo [topic] | rosplot [options] [x field] [y field]"
+        rostopic echo [topic] | rosplot [options] [x field] [y field(s)]"
 
         options:
             
     [number]    -i --update_interval : milliseconds between plot updates
     [number]    -c --point_count : max points to plot in sliding window
     [number]    --size : the size of the points
-    [o s t d +] --symbol : the symbol to use for the points
                 
             """
             sys.exit(1)
@@ -121,18 +145,22 @@ class InputThread(QtCore.QThread):
                 if yaml_string != "":
                     doc = yaml.load(yaml_string)
                     
+                    # unified x axis
                     if self.x_field == "time":
                         x = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
                     else:
                         x = self.traverse(doc, self.x_field)
 
-                    if self.y_field == "time":
-                        y = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
-                    else:
-                        y = self.traverse(doc, self.y_field)
+                    # potentially multiple y fields to plot
+                    for field_id,field in enumerate(self.y_fields):
 
-                    if x != None and y != None:
-                        self.addPoints([[x,y]])
+                        if field == "time":
+                            y = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
+                        else:
+                            y = self.traverse(doc, field)
+
+                        if x != None and y != None:
+                            self.addPoints([[x,y]], field_id)
 
                 yaml_string = ""
 
@@ -141,13 +169,15 @@ class InputThread(QtCore.QThread):
 
 #---------------------------------------------------
 
-    def setData(self, data):
-        self.set_data_signal.emit(data)
+    def setData(self, data, dataset_id):
+        self.set_data_signal.emit((data, dataset_id))
 
 #---------------------------------------------------
 
-    def addPoints(self, data):
-        self.point_buffer.extend(data)
+    def addPoints(self, data, dataset_id):
+        if len(self.point_buffers) <= dataset_id:
+            self.point_buffers.append([])
+        self.point_buffers[dataset_id].extend(data)
         
         time_now = int(round(time.time()*1000))
 
@@ -156,16 +186,19 @@ class InputThread(QtCore.QThread):
 
             if self.point_count == -1:
                 
-                self.add_points_signal.emit(self.point_buffer)
-                self.point_buffer = []
+                for i,v in enumerate(self.point_buffers):
+                    self.add_points_signal.emit((v, i))
+                    self.point_buffers[i] = []
             
             else:
+                sets = []
+                for i,v in enumerate(self.point_buffers):
+                    if len(v) > self.point_count:
+                        excess = len(v) - self.point_count
+                        del v[0:excess]
+                    sets.append((v,i))
                 
-                if len(self.point_buffer) > self.point_count:
-                    excess = len(self.point_buffer) - self.point_count
-                    del self.point_buffer[0:excess]
-
-                self.set_data_signal.emit(self.point_buffer)
+                self.set_data_signal.emit(sets)
 
 #---------------------------------------------------
 
