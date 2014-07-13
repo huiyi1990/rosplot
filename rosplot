@@ -124,13 +124,15 @@ class InputThread(QtCore.QThread):
 
         if arg_set("-h") or arg_set("--help"):
             print """
-        rostopic echo [topic] | rosplot [options] [x field] [y field(s)]"
+    rostopic echo [topic] | rosplot [options] [x field] [y field(s)]"
 
-        options:
+    options:
             
     [number]    -i --update_interval : milliseconds between plot updates
     [number]    -c --point_count : max points to plot in sliding window
     [number]    --size : the size of the points
+
+    hint: pass multiple y fields separated by commas to plot multiple fields
                 
             """
             sys.exit(1)
