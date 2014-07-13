@@ -123,28 +123,7 @@ class InputThread(QtCore.QThread):
             self.x_field = get_targ(1)
             self.y_fields = get_targ(2).split(",")
         except:
-            print ""
-            print "usage: rostopic echo [topic] | rosplot [x field] [y field(s)]"
-            print "example: rostopic echo /robot_pose | rosplot pose.position.x pose.position.y"
-            print ""
-            print "special field keyword: time"
-            print "example: rostopic echo /navsat/enu | rosplot time pose.position.z"
-            print ""
-            sys.exit(1)
-
-        if arg_set("-h") or arg_set("--help"):
-            print """
-    rostopic echo [topic] | rosplot [options] [x field] [y field(s)]"
-
-    options:
-            
-    [number]    -i --update_interval : milliseconds between plot updates
-    [number]    -c --point_count : max points to plot in sliding window
-    [number]    --size : the size of the points
-
-    hint: pass multiple y fields separated by commas to plot multiple fields
-                
-            """
+            print_help()
             sys.exit(1)
 
 #---------------------------------------------------
@@ -266,7 +245,26 @@ def arg_set(arg):
 
     return False
 
+
+def print_help():
+    print """
+    rostopic echo [topic] | rosplot [options] [x field] [y field(s)]"
+
+    options:
+            
+    [number]    -i --update_interval : milliseconds between plot updates
+    [number]    -c --point_count : max points to plot in sliding window
+    [number]    --size : the size of the points
+
+    hint: pass multiple y fields separated by commas to plot multiple fields
+                
+            """
+
 if __name__ == '__main__':
+    if arg_set("-h") or arg_set("--help"):
+        print_help()
+        sys.exit(1)
+
     app = QtGui.QApplication([])
     it = InputThread(sys.argv)
     it.start()
