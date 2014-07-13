@@ -36,7 +36,16 @@ class MainWindow(QtGui.QMainWindow):
 
         self.legend = self.w.addLegend()
 
-        self.legend_labels = get_targ(2).split(",")
+        self.x_fields = get_targ(1).split(",")
+        self.y_fields = get_targ(2).split(",")
+        self.legend_labels = []
+
+        if len(self.x_fields) == 1:
+            for f in self.y_fields:
+                self.legend_labels.append(f + " vs " + self.x_fields[0])
+        else:
+            for x,y in zip(self.x_fields,self.y_fields):
+                self.legend_labels.append(y + " vs " + x)
 
         alpha = int(get_arg("-a", 150))
 
