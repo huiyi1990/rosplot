@@ -272,7 +272,7 @@ def print_help():
     print """
 Usage:
 
-    rostopic echo [topic] | rosplot [x fields] [y fields] [options]"
+    rostopic echo [topic] | rosplot [x fields] [y fields] [options]
 
     options:
             

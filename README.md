@@ -5,7 +5,7 @@ Python tool for plotting arbitrary fields of ROS messages in real time
 
 Usage:
 
-    rostopic echo [topic] | rosplot [x fields] [y fields] [options]"
+    rostopic echo [topic] | rosplot [x fields] [y fields] [options]
 
     options:
             
