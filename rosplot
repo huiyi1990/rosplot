@@ -38,14 +38,16 @@ class MainWindow(QtGui.QMainWindow):
 
         self.legend_labels = get_targ(2).split(",")
 
+        alpha = int(get_arg("-a", 150))
+
         self.symbols = ["o", "s", "t", "d", "+"]
         self.brushes = [
-                pg.mkBrush(200,10,10,180),
-                pg.mkBrush(10,200,10,180),
-                pg.mkBrush(10,10,200,180),
-                pg.mkBrush(10,200,200,180),
-                pg.mkBrush(200,10,200,180),
-                pg.mkBrush(200,200,10,180)
+                pg.mkBrush(200,10,10,alpha),
+                pg.mkBrush(10,200,10,alpha),
+                pg.mkBrush(10,10,200,alpha),
+                pg.mkBrush(10,200,200,alpha),
+                pg.mkBrush(200,10,200,alpha),
+                pg.mkBrush(200,200,10,alpha)
                 ]
 
         for i,label in enumerate(self.legend_labels):
@@ -120,8 +122,13 @@ class InputThread(QtCore.QThread):
         self.point_count = int(get_arg("--point_count", self.point_count))
 
         try:
-            self.x_field = get_targ(1)
+            self.x_fields = get_targ(1).split(",")
             self.y_fields = get_targ(2).split(",")
+
+            if len(self.x_fields) != 1 and len(self.x_fields) != len(self.y_fields):
+                print "Either you must plot all Y fields against one X field"
+                print "or each Y field must be paired with an X field"
+                sys.exit(1)
         except:
             print_help()
             sys.exit(1)
@@ -135,28 +142,43 @@ class InputThread(QtCore.QThread):
             if "---" in line:
                 if yaml_string != "":
                     doc = yaml.load(yaml_string)
-                    
-                    # unified x axis
-                    if self.x_field == "time":
-                        x = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
-                    else:
-                        x = self.traverse(doc, self.x_field)
-
-                    # potentially multiple y fields to plot
-                    for field_id,field in enumerate(self.y_fields):
-
-                        if field == "time":
-                            y = self.traverse(doc, "header.stamp.secs") + self.traverse(doc, "header.stamp.nsecs")/1.0e9
-                        else:
-                            y = self.traverse(doc, field)
-
-                        if x != None and y != None:
-                            self.addPoints([[x,y]], field_id)
+                    self.processInput(doc)
 
                 yaml_string = ""
 
             else:
                 yaml_string += "\n" + line
+
+#---------------------------------------------------
+
+    def processInput(self, doc):
+
+        if len(self.x_fields) == 1: # one x field, N y fields
+            # unified x axis
+            x = self.traverse(doc, self.x_fields[0])
+
+            # potentially multiple y fields to plot
+            for field_id,field in enumerate(self.y_fields):
+                y = self.traverse(doc, field)
+
+                if x != None and y != None:
+                    self.addPoints([[x,y]], field_id)
+
+
+        else: # one x field per y field
+            for i,pair in enumerate(zip(self.x_fields, self.y_fields)):
+                x = self.traverse(doc, pair[0])
+                y = self.traverse(doc, pair[1])
+
+                self.addPoints([[x,y]], i)
+
+#---------------------------------------------------
+
+    def traverse(self, doc, field):
+        if field == "time":
+            return self.traverse_raw(doc, "header.stamp.secs") + self.traverse_raw(doc, "header.stamp.nsecs")/1.0e9
+        else:
+            return self.traverse_raw(doc, field)
 
 #---------------------------------------------------
 
@@ -193,7 +215,7 @@ class InputThread(QtCore.QThread):
 
 #---------------------------------------------------
 
-    def traverse(self, doc, address):
+    def traverse_raw(self, doc, address):
         try:
             path = address.split(".")
             i = 0
@@ -248,13 +270,14 @@ def arg_set(arg):
 
 def print_help():
     print """
-    rostopic echo [topic] | rosplot [options] [x field] [y field(s)]"
+    rostopic echo [topic] | rosplot [options] [x fields] [y fields]"
 
     options:
             
     [number]    -i --update_interval : milliseconds between plot updates
     [number]    -c --point_count : max points to plot in sliding window
     [number]    --size : the size of the points
+    [0-255]     -a : alpha, the transparency of the points
 
     hint: pass multiple y fields separated by commas to plot multiple fields
                 
