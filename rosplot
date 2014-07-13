@@ -270,7 +270,9 @@ def arg_set(arg):
 
 def print_help():
     print """
-    rostopic echo [topic] | rosplot [options] [x fields] [y fields]"
+Usage:
+
+    rostopic echo [topic] | rosplot [x fields] [y fields] [options]"
 
     options:
             
@@ -281,6 +283,22 @@ def print_help():
 
     hint: pass multiple y fields separated by commas to plot multiple fields
                 
+Examples:
+
+    --- gps positions ---
+    rostopic echo /android/fix | ./rosplot latitude longitude
+
+    --- simple time series ---
+    rostopic echo /android/barometric_pressure | ./rosplot time fluid_pressure
+
+    --- fast update, rolling window ---
+    rostopic echo /android/illuminance | ./rosplot time illuminance -i 50 -c 200
+
+    --- multiple y fields plotted against one x field ---
+    rostopic echo /android/imu | ./rosplot time linear_acceleration.x,linear_acceleration.y,linear_acceleration.z
+
+    --- three pairs of fields ---
+    rostopic echo /android/imu | ./rosplot linear_acceleration.x,linear_acceleration.z,linear_acceleration.y linear_acceleration.z,linear_acceleration.y,linear_acceleration.x
             """
 
 if __name__ == '__main__':
