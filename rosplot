@@ -15,6 +15,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
 import time
+from collections import deque
 
 import yaml
 
@@ -40,6 +41,14 @@ class MainWindow(QtGui.QMainWindow):
         self.y_fields = get_targ(2).split(",")
         self.legend_labels = []
 
+        self.alpha = get_arg("-a", "180")
+        if "-" in self.alpha:
+            self.min_alpha = int(self.alpha.split("-")[0])
+            self.alpha = max(0,min(255,int(self.alpha.split("-")[1])))
+        else:
+            self.min_alpha = 80
+            self.alpha = int(self.alpha)
+
         if len(self.x_fields) == 1:
             for f in self.y_fields:
                 self.legend_labels.append(f + " vs " + self.x_fields[0])
@@ -47,23 +56,32 @@ class MainWindow(QtGui.QMainWindow):
             for x,y in zip(self.x_fields,self.y_fields):
                 self.legend_labels.append(y + " vs " + x)
 
-        alpha = int(get_arg("-a", 150))
+        self.point_count = int(get_arg("-c", -1))
+        self.point_count = int(get_arg("--point_count", self.point_count))
 
         self.symbols = ["o", "s", "t", "d", "+"]
-        self.brushes = [
-                pg.mkBrush(200,10,10,alpha),
-                pg.mkBrush(10,200,10,alpha),
-                pg.mkBrush(10,10,200,alpha),
-                pg.mkBrush(10,200,200,alpha),
-                pg.mkBrush(200,10,200,alpha),
-                pg.mkBrush(200,200,10,alpha)
-                ]
+        self.brushes = []
+        for alpha in range(0,256)[::-1]:
+            self.brushes.append([
+                pg.mkBrush(240,10,10,alpha),
+                pg.mkBrush(10,240,10,alpha),
+                pg.mkBrush(10,10,240,alpha),
+                pg.mkBrush(10,240,240,alpha),
+                pg.mkBrush(240,10,240,alpha),
+                pg.mkBrush(240,240,10,alpha),
+                pg.mkBrush(10,120,240,alpha),
+                pg.mkBrush(120,10,240,alpha),
+                pg.mkBrush(240,120,10,alpha),
+                pg.mkBrush(10,240,120,alpha),
+                pg.mkBrush(240,10,120,alpha),
+                pg.mkBrush(240,120,10,alpha)
+                ])
 
         for i,label in enumerate(self.legend_labels):
             dummy_plot_item = pg.ScatterPlotItem(
                     size=int(get_arg("--size", 12)),
                     pen=pg.mkPen(None),
-                    brush=self.brushes[i%len(self.brushes)],
+                    brush=self.brushes[255][i%len(self.brushes[255])],
                     symbol=self.symbols[i%len(self.symbols)])
             self.legend.addItem(dummy_plot_item, "- - " + label)
 
@@ -84,15 +102,24 @@ class MainWindow(QtGui.QMainWindow):
         for data in datasets:
             dataset_id = data[1]
             data = data[0]
-            pos = np.asarray(data)
+            pos = np.asarray(data)[::-1]
             _spots = [
                 {'pos': pos[i,:], 
                 'data': 1,
-                'brush': self.brushes[dataset_id%len(self.brushes)],
+                'brush': self.get_brush(i,self.point_count,dataset_id),
                 'symbol': self.symbols[dataset_id%len(self.symbols)],
                 } for i in range(pos.shape[0])]
             spots.extend(_spots)
         self.s1.setData(spots)
+
+#---------------------------------------------------
+
+    def get_brush(self, i, n, did):
+        if i < 0 or i >= n:
+            i = max(0,min(n-1,i))
+        gap = self.alpha - self.min_alpha
+        alpha_list = self.brushes[int(gap*float(i)/n+self.min_alpha)]
+        return alpha_list[did%len(alpha_list)]
 
 #---------------------------------------------------
 
@@ -103,7 +130,7 @@ class MainWindow(QtGui.QMainWindow):
         spots = [
             {'pos': pos[i,:], 
             'data': 1,
-            'brush': self.brushes[dataset_id%len(self.brushes)],
+            'brush': self.brushes[self.alpha][dataset_id%len(self.brushes[self.alpha])],
             'symbol': self.symbols[dataset_id%len(self.symbols)],
             } for i in range(pos.shape[0])]
         self.s1.addPoints(spots)
@@ -204,7 +231,7 @@ class InputThread(QtCore.QThread):
 
     def addPoints(self, data, dataset_id):
         if len(self.point_buffers) <= dataset_id:
-            self.point_buffers.append([])
+            self.point_buffers.append(deque())
         self.point_buffers[dataset_id].extend(data)
         
         time_now = int(round(time.time()*1000))
@@ -223,7 +250,9 @@ class InputThread(QtCore.QThread):
                 for i,v in enumerate(self.point_buffers):
                     if len(v) > self.point_count:
                         excess = len(v) - self.point_count
-                        del v[0:excess]
+                        for j in range(0,excess):
+                            v.popleft()
+                        
                     sets.append((v,i))
                 
                 self.set_data_signal.emit(sets)
@@ -294,7 +323,7 @@ Usage:
     [number]    -i --update_interval : milliseconds between plot updates
     [number]    -c --point_count : max points to plot in sliding window
     [number]    --size : the size of the points
-    [0-255]     -a : alpha, the transparency of the points
+    [0-255]     -a : transparency of points (has no effect if -c is set)
 
     hint: pass multiple y fields separated by commas to plot multiple fields
                 
