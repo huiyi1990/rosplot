@@ -49,6 +49,8 @@ class MainWindow(QtGui.QMainWindow):
             self.min_alpha = 80
             self.alpha = int(self.alpha)
 
+        self.fade_points = not arg_set("--disable_fade")
+
         if len(self.x_fields) == 1:
             for f in self.y_fields:
                 self.legend_labels.append(f + " vs " + self.x_fields[0])
@@ -115,6 +117,9 @@ class MainWindow(QtGui.QMainWindow):
 #---------------------------------------------------
 
     def get_brush(self, i, n, did):
+        if not self.fade_points:
+            return self.brushes[255-self.alpha][did%len(self.brushes[0])]
+
         if i < 0 or i >= n:
             i = max(0,min(n-1,i))
         gap = self.alpha - self.min_alpha
@@ -324,6 +329,8 @@ Usage:
     [number]    -c --point_count : max points to plot in sliding window
     [number]    --size : the size of the points
     [0-255]     -a : transparency of points (has no effect if -c is set)
+
+                --disable_fade : don't fade points over time when -c is set
 
     hint: pass multiple y fields separated by commas to plot multiple fields
                 
