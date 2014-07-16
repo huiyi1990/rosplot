@@ -83,7 +83,7 @@ class MainWindow(QtGui.QMainWindow):
             dummy_plot_item = pg.ScatterPlotItem(
                     size=int(get_arg("--size", 12)),
                     pen=pg.mkPen(None),
-                    brush=self.brushes[255][i%len(self.brushes[255])],
+                    brush=self.brushes[0][i%len(self.brushes[0])],
                     symbol=self.symbols[i%len(self.symbols)])
             self.legend.addItem(dummy_plot_item, "- - " + label)
 
