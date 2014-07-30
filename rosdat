@@ -1,0 +1,138 @@
+#! /usr/bin/env python
+
+import yaml, sys
+
+class InputThread():
+    def __init__(self, argv):
+        try:
+            self.x_field = get_targ(1)
+            self.y_field = get_targ(2)
+            self.delimiter = get_arg("--delimiter", " ")
+            self.delimiter = get_arg("-d", self.delimiter)
+
+        except:
+            print_help()
+            sys.exit(1)
+
+#---------------------------------------------------
+
+    def run(self):
+        yaml_string = ""
+        while True:
+            line = sys.stdin.readline()
+            if "---" in line:
+                if yaml_string != "":
+                    doc = yaml.load(yaml_string)
+                    self.processInput(doc)
+
+                yaml_string = ""
+
+            else:
+                yaml_string += "\n" + line
+
+#---------------------------------------------------
+
+    def processInput(self, doc):
+	x = self.traverse(doc, self.x_field)
+	y = self.traverse(doc, self.y_field)
+
+        if x != None and y != None:
+            print "%s%s%s" % (x,self.delimiter,y)
+
+#---------------------------------------------------
+
+    def traverse(self, doc, field):
+        if field == "time":
+            t = self.traverse_raw(doc, "header.stamp.secs") + self.traverse_raw(doc, "header.stamp.nsecs")/1.0e9
+            if self.first_time == None:
+                self.first_time = t
+
+            return t - self.first_time
+        else:
+            return self.traverse_raw(doc, field)
+
+#---------------------------------------------------
+
+    def traverse_raw(self, doc, address):
+        try:
+            path = address.split(".")
+            i = 0
+            node = doc
+            while i < len(path):
+                if "[" in path[i] or "]" in path[i]:
+                    p = path[i].split("[")[0]
+                    idx = int(path[i].split("[")[1].split("]")[0])
+                    node = node[p.strip()]
+                    node = node[idx]
+                else:
+                    node = node[path[i].strip()]
+
+                i += 1
+
+            return float(node)
+
+        except:
+            print "warning, could not parse %s in %s" % (address, doc)
+            return None
+
+#---------------------------------------------------
+# main
+#---------------------------------------------------
+
+def get_arg(arg, default):
+    for i,v in enumerate(sys.argv):
+        if v == arg:
+            if i+1 < len(sys.argv):
+                return sys.argv[i+1]
+            else:
+                return default
+
+    return default
+
+# get non-option args
+def get_targ(idx):
+    i = 0
+    for v in sys.argv:
+        if not v.startswith("-"):
+            if idx == i:
+                return v
+            i += 1
+
+def arg_set(arg):
+    for v in sys.argv:
+        if v == arg:
+            return True
+
+    return False
+
+
+def print_help():
+    print """
+Usage:
+
+    rostopic echo [topic] | rosdat [x field] [y field] [options]
+
+    options:
+        
+        -d, --delimiter : the delimiter by which to separate the fields. Default: space
+            
+Examples:
+
+    --- gps positions ---
+    rostopic echo /android/fix | ./rosdat latitude longitude
+
+    --- simple time series ---
+    rostopic echo /android/barometric_pressure | ./rosdat time fluid_pressure
+
+    --- time series, csv ---
+    rostopic echo /android/illuminance | ./rosdat time illuminance -d ","
+
+"""
+
+if __name__ == '__main__':
+    if arg_set("-h") or arg_set("--help"):
+        print_help()
+        sys.exit(1)
+
+    it = InputThread(sys.argv)
+    it.run()
